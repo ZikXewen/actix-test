@@ -1,6 +1,6 @@
 use actix_web::{
-    get,
-    web::{Data, Json, Path, Query},
+    get, post,
+    web::{Data, Form, Json, Path, Query},
     App, Either, HttpResponse, HttpServer, Responder,
 };
 use serde::Deserialize;
@@ -11,14 +11,9 @@ struct AppState {
     mut_state: Mutex<u8>,
 }
 #[derive(Deserialize)]
-struct PathInfo {
+struct ParamsInfo {
     u_arg: u32,
     s_arg: String,
-}
-#[derive(Deserialize)]
-struct QueryInfo {
-    arg1: String,
-    arg2: String,
 }
 
 /// Example page.
@@ -60,26 +55,37 @@ async fn either() -> impl Responder {
     }
 }
 
+/// Example page with path parameters
 #[get("/path/{u_arg}/{s_arg}")]
-async fn path(path: /*Path<(u32, String)>*/ Path<PathInfo>) -> impl Responder {
+async fn path(path: /*Path<(u32, String)>*/ Path<ParamsInfo>) -> impl Responder {
     // let path = path.into_inner();
     format!("{}, {}", path.u_arg, path.s_arg)
 }
 
+/// Example page with query parameters
 #[get("/query")]
-async fn query(query: Query<QueryInfo>) -> impl Responder {
-    format!("{}, {}", query.arg1, query.arg2)
+async fn query(query: Query<ParamsInfo>) -> impl Responder {
+    format!("{}, {}", query.u_arg, query.s_arg)
 }
 
-#[get("/json")]
-async fn json(json: Json<(String,)>) -> impl Responder {
-    json.into_inner().0
+/// Example page with a request body.
+#[post("/json")]
+async fn json(body: Json<ParamsInfo>) -> impl Responder {
+    format!("{}, {}", body.u_arg, body.s_arg)
+}
+
+/// Example page with a URL-encoded form.
+#[post("/form")]
+async fn form(form: Form<ParamsInfo>) -> impl Responder {
+    format!("{}, {}", form.u_arg, form.s_arg)
 }
 
 #[actix_web::main]
 async fn main() -> Result<()> {
     // App data are not shared between threads
     // so we should initialize Mutex outside the scope
+    // If we need some thread-specific states, however,
+    // check https://actix.rs/docs/extractors/
     let app_data = Data::new(AppState {
         state: "rust-server".to_owned(),
         mut_state: Mutex::new(0),
@@ -97,6 +103,7 @@ async fn main() -> Result<()> {
             .service(path)
             .service(query)
             .service(json)
+            .service(form)
     })
     .workers(2)
     // .keep_alive(KeepAlive::Os)
